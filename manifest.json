@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Link Preview Tab",
+  "version": "1.0",
+  "description": "Shows a preview of a link in a tab-like view when hovering for 2 seconds",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
