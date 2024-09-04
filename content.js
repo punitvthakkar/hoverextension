@@ -1,12 +1,16 @@
-// file: content.js
-
 let previewContainer = null;
 let previewContent = null;
 let hoverTimer = null;
+let spinnerTimeout = null;
 
 function createPreviewElements() {
   previewContainer = document.createElement('div');
   previewContainer.id = 'link-preview-container';
+  
+  const spinner = document.createElement('div');
+  spinner.id = 'link-preview-spinner';
+  spinner.innerHTML = '<div class="spinner"></div>';
+  document.body.appendChild(spinner);
   
   const header = document.createElement('div');
   header.id = 'link-preview-header';
@@ -16,6 +20,21 @@ function createPreviewElements() {
   
   const buttonsContainer = document.createElement('div');
   buttonsContainer.id = 'link-preview-buttons';
+  
+  const copyButton = document.createElement('button');
+  copyButton.id = 'link-preview-copy';
+  copyButton.textContent = 'Copy Link';
+  copyButton.addEventListener('click', () => {
+    const url = previewContainer.getAttribute('data-url');
+    if (url) {
+      navigator.clipboard.writeText(url).then(() => {
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = 'Copy Link';
+        }, 2000);
+      });
+    }
+  });
   
   const openButton = document.createElement('button');
   openButton.id = 'link-preview-open';
@@ -32,6 +51,7 @@ function createPreviewElements() {
   closeButton.textContent = '×';
   closeButton.addEventListener('click', hidePreview);
   
+  buttonsContainer.appendChild(copyButton);
   buttonsContainer.appendChild(openButton);
   buttonsContainer.appendChild(closeButton);
   
@@ -73,14 +93,12 @@ function showPreview(url, x, y) {
   const windowWidth = window.innerWidth;
   const windowHeight = window.innerHeight;
   
-  // Increase the size by 20%
-  const previewWidth = Math.min(windowWidth * 0.72, windowWidth - 40);  // 0.6 * 1.2 = 0.72
+  const previewWidth = Math.min(windowWidth * 0.72, windowWidth - 40);
   const previewHeight = Math.min(windowHeight * 0.72, windowHeight - 40);
   
   previewContainer.style.width = `${previewWidth}px`;
   previewContainer.style.height = `${previewHeight}px`;
   
-  // Adjust positioning to prevent spilling out of the window
   let left = Math.min(Math.max(x - previewWidth / 2, 20), windowWidth - previewWidth - 20);
   let top = Math.min(Math.max(y - previewHeight / 2, 20), windowHeight - previewHeight - 20);
   
@@ -89,7 +107,21 @@ function showPreview(url, x, y) {
   
   previewContainer.setAttribute('data-url', url);
   
+  // Show spinner
+  const spinner = document.getElementById('link-preview-spinner');
+  spinner.style.display = 'flex';
+  spinner.style.left = `${left + previewWidth / 2 - 25}px`;
+  spinner.style.top = `${top + previewHeight / 2 - 25}px`;
+  spinner.style.opacity = '0';
+  
+  spinnerTimeout = setTimeout(() => {
+    spinner.style.opacity = '1';
+  }, 500);
+  
   chrome.runtime.sendMessage({action: "fetchContent", url: url}, (response) => {
+    clearTimeout(spinnerTimeout);
+    spinner.style.display = 'none';
+    
     if (response.content) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(response.content, 'text/html');
@@ -105,7 +137,6 @@ function showPreview(url, x, y) {
           }
         });
       });
-      // Add event listener to open links in new tabs
       previewContent.querySelectorAll('a').forEach(link => {
         link.addEventListener('click', (e) => {
           e.preventDefault();
@@ -113,13 +144,11 @@ function showPreview(url, x, y) {
         });
       });
       
-      // Set viewport meta tag for responsive design
       const viewport = document.createElement('meta');
       viewport.setAttribute('name', 'viewport');
       viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
       previewContent.insertBefore(viewport, previewContent.firstChild);
       
-      // Add custom styles for responsiveness
       const style = document.createElement('style');
       style.textContent = `
         body { 
@@ -138,15 +167,22 @@ function showPreview(url, x, y) {
     } else {
       previewContent.innerHTML = '<p>Failed to load content. Please try opening the link in a new tab.</p>';
     }
+    
+    previewContainer.style.display = 'flex';
+    previewContainer.style.opacity = '0';
+    setTimeout(() => {
+      previewContainer.style.opacity = '1';
+    }, 10);
   });
-  
-  previewContainer.style.display = 'flex';
 }
 
 function hidePreview() {
   if (previewContainer) {
-    previewContainer.style.display = 'none';
-    previewContent.innerHTML = '';
+    previewContainer.style.opacity = '0';
+    setTimeout(() => {
+      previewContainer.style.display = 'none';
+      previewContent.innerHTML = '';
+    }, 300);
   }
 }
 
@@ -172,12 +208,22 @@ function handleClick(event) {
   }
 }
 
+function handleContextMenu(event) {
+  const link = event.target.closest('a');
+  if (link) {
+    event.preventDefault();
+    const url = link.href;
+    const rect = link.getBoundingClientRect();
+    showPreview(url, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+}
+
 createPreviewElements();
 
 document.addEventListener('mouseover', handleMouseEnter);
 document.addEventListener('mouseout', handleMouseLeave);
 document.addEventListener('click', handleClick);
-// Escape Key Functionality
+document.addEventListener('contextmenu', handleContextMenu);
 document.addEventListener('keydown', (e) => {
   if (e.key === "Escape") {
     hidePreview();
