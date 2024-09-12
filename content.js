@@ -2,6 +2,10 @@ let previewContainer = null;
 let previewContent = null;
 let hoverTimer = null;
 let spinnerTimeout = null;
+let notificationElement = null;
+let currentHoveredLink = null;
+let copyButton = null;
+let openButton = null;
 
 function createPreviewElements() {
   previewContainer = document.createElement('div');
@@ -21,30 +25,15 @@ function createPreviewElements() {
   const buttonsContainer = document.createElement('div');
   buttonsContainer.id = 'link-preview-buttons';
   
-  const copyButton = document.createElement('button');
+  copyButton = document.createElement('button');
   copyButton.id = 'link-preview-copy';
-  copyButton.textContent = 'Copy Link';
-  copyButton.addEventListener('click', () => {
-    const url = previewContainer.getAttribute('data-url');
-    if (url) {
-      navigator.clipboard.writeText(url).then(() => {
-        copyButton.textContent = 'Copied!';
-        setTimeout(() => {
-          copyButton.textContent = 'Copy Link';
-        }, 2000);
-      });
-    }
-  });
+  copyButton.textContent = 'Copy Link (C)';
+  copyButton.addEventListener('click', copyLink);
   
-  const openButton = document.createElement('button');
+  openButton = document.createElement('button');
   openButton.id = 'link-preview-open';
-  openButton.textContent = 'Open in New Tab';
-  openButton.addEventListener('click', () => {
-    const url = previewContainer.getAttribute('data-url');
-    if (url) {
-      window.open(url, '_blank');
-    }
-  });
+  openButton.textContent = 'Open in New Tab (T)';
+  openButton.addEventListener('click', openInNewTab);
   
   const closeButton = document.createElement('button');
   closeButton.id = 'link-preview-close';
@@ -87,6 +76,12 @@ function createPreviewElements() {
   document.addEventListener('mouseup', () => {
     isDragging = false;
   });
+
+  notificationElement = document.createElement('div');
+  notificationElement.id = 'link-preview-notification';
+  notificationElement.textContent = 'Press "O" to open popup view';
+  notificationElement.style.display = 'none';
+  document.body.appendChild(notificationElement);
 }
 
 function showPreview(url, x, y) {
@@ -186,20 +181,52 @@ function hidePreview() {
   }
 }
 
+function showNotification(x, y) {
+  notificationElement.style.left = `${x}px`;
+  notificationElement.style.top = `${y}px`;
+  notificationElement.style.display = 'block';
+}
+function hideNotification() {
+  notificationElement.style.display = 'none';
+}
+
+function copyLink() {
+  const url = previewContainer.getAttribute('data-url');
+  if (url) {
+    navigator.clipboard.writeText(url).then(() => {
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => {
+        copyButton.textContent = 'Copy Link (C)';
+      }, 2000);
+    });
+  }
+}
+
+function openInNewTab() {
+  const url = previewContainer.getAttribute('data-url');
+  if (url) {
+    window.open(url, '_blank');
+  }
+}
+
 function handleMouseEnter(event) {
   const link = event.target.closest('a');
   if (link) {
     const url = link.href;
     const rect = link.getBoundingClientRect();
+    currentHoveredLink = link;
     
+    clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
-      showPreview(url, rect.left + rect.width / 2, rect.top + rect.height / 2);
-    }, 2000);
+      showNotification(rect.right, rect.top);
+    }, 500);
   }
 }
 
 function handleMouseLeave(event) {
   clearTimeout(hoverTimer);
+  hideNotification();
+  currentHoveredLink = null;
 }
 
 function handleClick(event) {
@@ -218,6 +245,25 @@ function handleContextMenu(event) {
   }
 }
 
+function handleKeyPress(event) {
+  if (event.key === 'o' || event.key === 'O') {
+    if (currentHoveredLink) {
+      const url = currentHoveredLink.href;
+      const rect = currentHoveredLink.getBoundingClientRect();
+      showPreview(url, rect.left + rect.width / 2, rect.top + rect.height / 2);
+      hideNotification();
+    }
+  } else if (event.key === 'c' || event.key === 'C') {
+    if (previewContainer.style.display !== 'none') {
+      copyLink();
+    }
+  } else if (event.key === 't' || event.key === 'T') {
+    if (previewContainer.style.display !== 'none') {
+      openInNewTab();
+    }
+  }
+}
+
 createPreviewElements();
 
 document.addEventListener('mouseover', handleMouseEnter);
@@ -229,3 +275,4 @@ document.addEventListener('keydown', (e) => {
     hidePreview();
   }
 });
+document.addEventListener('keypress', handleKeyPress);
