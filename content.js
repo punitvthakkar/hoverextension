@@ -236,13 +236,8 @@ function handleClick(event) {
 }
 
 function handleContextMenu(event) {
-  const link = event.target.closest('a');
-  if (link) {
-    event.preventDefault();
-    const url = link.href;
-    const rect = link.getBoundingClientRect();
-    showPreview(url, rect.left + rect.width / 2, rect.top + rect.height / 2);
-  }
+  // Remove the automatic preview opening on right-click
+  // This allows the default context menu to appear
 }
 
 function handleKeyPress(event) {
